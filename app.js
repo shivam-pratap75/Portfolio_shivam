@@ -6,6 +6,7 @@ const session = require('express-session');
 const flash = require('connect-flash');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
+const MongoStore = require('connect-mongo');
 
 
 // Load env vars
@@ -34,15 +35,20 @@ app.set('layout', './layouts/main');
 // Session middleware
 app.set("trust proxy", 1);
 const isProduction = process.env.NODE_ENV === "production";
-
 app.use(session({
   secret: process.env.SESSION_SECRET || "secret",
   resave: false,
   saveUninitialized: false,
+  
+  store: MongoStore.create({
+    mongoUrl: process.env.MONGO_URI,
+    collectionName: 'sessions'
+  }),
+
   cookie: {
     maxAge: 24 * 60 * 60 * 1000,
-    secure: isProduction,                     // ✅ required for Render
-    sameSite: isProduction ? "none" : "lax"   // ✅ important
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax"
   }
 }));
 
