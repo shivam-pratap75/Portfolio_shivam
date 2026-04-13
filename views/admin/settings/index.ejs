@@ -120,7 +120,7 @@
         <form action="/admin/settings/skills" method="POST" class="settings-form">
           <div class="form-group">
             <label for="skillNames">Skills (comma-separated)</label>
-            <textarea id="skillNames" name="skillNames" rows="4" placeholder="e.g., Node.js, Express, MongoDB, React, JavaScript"><%= settings.skills.map(s => s.name).join(', ') %></textarea>
+           <textarea id="skillNames" name="skillNames" rows="4"  placeholder="Enter NEW skills only (e.g., Node.js, React)"></textarea>
           </div>
 
           <% if (settings.skills && settings.skills.length > 0) { %>
