@@ -92,7 +92,10 @@ exports.updateSkills = async (req, res) => {
       settings = new SiteSettings();
     }
 
-    if (skillNames) {
+   if (!skillNames || skillNames.trim() === '') {
+  req.flash('error_msg', 'Please enter at least one skill');
+  return res.redirect('/admin/settings');
+   }
       let skillsArray;
 
       if (Array.isArray(skillNames)) {
@@ -120,7 +123,7 @@ exports.updateSkills = async (req, res) => {
 
       // Append skills
       settings.skills = [...settings.skills, ...newSkills];
-    }
+    
 
     settings.updatedAt = Date.now();
 
