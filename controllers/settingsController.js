@@ -1,4 +1,66 @@
 const SiteSettings = require('../models/SiteSettings');
+const multer = require("multer");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const cloudinary = require("../cloudinary");
+
+
+// Configure Cloudinary storage for skill icons
+const skillIconStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "portfolio/skills",
+    allowed_formats: ["jpg", "png", "jpeg", "webp", "svg"],
+    transformation: [{ width: 100, height: 100, crop: "limit" }]
+  }
+});
+const uploadSkillIcon = multer({ storage: skillIconStorage });
+
+// @desc    Delete a skill
+// @route   DELETE /admin/settings/skills/:skillId
+exports.deleteSkill = async (req, res) => {
+  try {
+    const { skillId } = req.params;
+    
+    let settings = await SiteSettings.findOne();
+    
+    if (!settings) {
+      req.flash('error_msg', 'Settings not found');
+      return res.redirect('/admin/settings');
+    }
+    
+    const skill = settings.skills.find(s => s._id.toString() === skillId);
+    
+    if (!skill) {
+      req.flash('error_msg', 'Skill not found');
+      return res.redirect('/admin/settings');
+    }
+    
+    // Delete image from Cloudinary if exists
+    if (skill.image && skill.image.includes('cloudinary')) {
+      try {
+        const publicId = skill.image.split('/upload/')[1]?.split('.')[0];
+        if (publicId) {
+          await cloudinary.uploader.destroy(publicId);
+        }
+      } catch (deleteError) {
+        console.error('Failed to delete image:', deleteError);
+      }
+    }
+    
+    settings.skills = settings.skills.filter(s => s._id.toString() !== skillId);
+    settings.updatedAt = Date.now();
+    
+    await settings.save();
+    
+    req.flash('success_msg', 'Skill deleted successfully');
+    res.redirect('/admin/settings');
+  } catch (error) {
+    console.error(error);
+    req.flash('error_msg', 'Error deleting skill');
+    res.redirect('/admin/settings');
+  }
+};
+
 
 // @desc    Get settings page
 // @route   GET /admin/settings
@@ -79,8 +141,7 @@ exports.updateSocial = async (req, res) => {
     res.redirect('/admin/settings');
   }
 };
-
-// @desc    Update skills
+// @desc    Update skills (add new skills)
 // @route   POST /admin/settings/skills
 exports.updateSkills = async (req, res) => {
   try {
@@ -92,44 +153,48 @@ exports.updateSkills = async (req, res) => {
       settings = new SiteSettings();
     }
 
-   if (!skillNames || skillNames.trim() === '') {
-  req.flash('error_msg', 'Please enter at least one skill');
-  return res.redirect('/admin/settings');
-   }
-      let skillsArray;
-
-      if (Array.isArray(skillNames)) {
-        skillsArray = skillNames.map(skill => skill.trim()).filter(skill => skill);
-      } else {
-        skillsArray = skillNames.split(',').map(skill => skill.trim()).filter(skill => skill);
-      }
-
-      // Ensure existing skills array exists
-      if (!settings.skills) {
-        settings.skills = [];
-      }
-
-      // Avoid duplicates
-      const existingSkillNames = settings.skills.map(s => s.name.toLowerCase());
-
-      const newSkills = skillsArray
-        .filter(skill => !existingSkillNames.includes(skill.toLowerCase()))
-        .map((skill, index) => ({
-          name: skill,
-          icon: getIconForSkill(skill),
-          image: '',
-          order: settings.skills.length + index
-        }));
-
-      // Append skills
-      settings.skills = [...settings.skills, ...newSkills];
+    if (!skillNames || skillNames.trim() === '') {
+      req.flash('error_msg', 'Please enter at least one skill');
+      return res.redirect('/admin/settings');
+    }
     
+    let skillsArray;
+    if (Array.isArray(skillNames)) {
+      skillsArray = skillNames.map(skill => skill.trim()).filter(skill => skill);
+    } else {
+      skillsArray = skillNames.split(',').map(skill => skill.trim()).filter(skill => skill);
+    }
 
+    // Ensure existing skills array exists
+    if (!settings.skills) {
+      settings.skills = [];
+    }
+
+    // Get existing skill names (case-insensitive)
+    const existingSkillNames = settings.skills.map(s => s.name.toLowerCase());
+
+    // Filter out duplicates
+    const newSkills = skillsArray
+      .filter(skill => !existingSkillNames.includes(skill.toLowerCase()))
+      .map((skill, index) => ({
+        name: skill,
+        icon: getIconForSkill(skill),
+        image: '', // Empty initially, user can upload later
+        order: settings.skills.length + index
+      }));
+
+    if (newSkills.length === 0) {
+      req.flash('error_msg', 'All skills already exist');
+      return res.redirect('/admin/settings');
+    }
+
+    // Append new skills
+    settings.skills = [...settings.skills, ...newSkills];
     settings.updatedAt = Date.now();
 
     await settings.save();
 
-    req.flash('success_msg', 'Skills added successfully');
+    req.flash('success_msg', `${newSkills.length} skill(s) added successfully`);
     res.redirect('/admin/settings');
 
   } catch (error) {
@@ -140,40 +205,58 @@ exports.updateSkills = async (req, res) => {
 };
 
 // @desc    Upload skill icon image
-// @route   POST /admin/settings/skills/upload/:skillName
+// @route   POST /admin/settings/skills/upload/:skillId
 exports.uploadSkillIcon = async (req, res) => {
   try {
-    const { skillName } = req.params;
+    const { skillId } = req.params;
     
-    if (!req.file) {
-      req.flash('error_msg', 'No image uploaded');
-      return res.redirect('/admin/settings');
-    }
-    
-    let settings = await SiteSettings.findOne();
-    
-    if (!settings) {
-      req.flash('error_msg', 'Settings not found');
-      return res.redirect('/admin/settings');
-    }
-    
-    // Find and update the specific skill
-    const skillIndex = settings.skills.findIndex(
-      s => s.name.toLowerCase() === skillName.toLowerCase()
-    );
-    
-    if (skillIndex === -1) {
-      req.flash('error_msg', 'Skill not found');
-      return res.redirect('/admin/settings');
-    }
-    
-    settings.skills[skillIndex].image = `/images/${req.file.filename}`;
-    settings.updatedAt = Date.now();
-    
-    await settings.save();
-    
-    req.flash('success_msg', 'Skill icon uploaded successfully');
-    res.redirect('/admin/settings');
+    // Use multer to handle upload
+    uploadSkillIcon.single('image')(req, res, async function(err) {
+      if (err) {
+        req.flash('error_msg', 'Image upload failed: ' + err.message);
+        return res.redirect('/admin/settings');
+      }
+      
+      if (!req.file) {
+        req.flash('error_msg', 'No image uploaded');
+        return res.redirect('/admin/settings');
+      }
+      
+      let settings = await SiteSettings.findOne();
+      
+      if (!settings) {
+        req.flash('error_msg', 'Settings not found');
+        return res.redirect('/admin/settings');
+      }
+      
+      // Find the skill by ID (better than name)
+      const skillIndex = settings.skills.findIndex(
+        s => s._id.toString() === skillId
+      );
+      
+      if (skillIndex === -1) {
+        req.flash('error_msg', 'Skill not found');
+        return res.redirect('/admin/settings');
+      }
+      
+      // Delete old image from Cloudinary if exists
+      const oldImage = settings.skills[skillIndex].image;
+      if (oldImage && oldImage.includes('cloudinary')) {
+        const publicId = oldImage.split('/upload/')[1]?.split('.')[0];
+        if (publicId) {
+          await cloudinary.uploader.destroy(publicId);
+        }
+      }
+      
+      // Save new Cloudinary URL
+      settings.skills[skillIndex].image = req.file.path; // Cloudinary URL
+      settings.updatedAt = Date.now();
+      
+      await settings.save();
+      
+      req.flash('success_msg', 'Skill icon uploaded successfully');
+      res.redirect('/admin/settings');
+    });
   } catch (error) {
     console.error(error);
     req.flash('error_msg', 'Error uploading skill icon');

@@ -1,32 +1,32 @@
 const Project = require('../models/Project');
-const path = require('path');
-const multer = require('multer');
+const multer = require("multer");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const cloudinary = require("../cloudinary");
 
-// Configure multer for file upload
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'public/uploads/');
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'project-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
 
-const upload = multer({ 
-  storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-  fileFilter: function (req, file, cb) {
-    const filetypes = /jpeg|jpg|png|gif|webp/;
-    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = filetypes.test(file.mimetype);
-    
-    if (mimetype && extname) {
-      return cb(null, true);
+const deleteCloudinaryImage = async (imageUrl) => {
+  if (imageUrl && !imageUrl.includes('default_projectImage.png')) {
+    try {
+      // Extract public_id from Cloudinary URL
+      const publicId = imageUrl.split('/portfolio/')[1]?.split('.')[0];
+      if (publicId) {
+        await cloudinary.uploader.destroy(`portfolio/${publicId}`);
+      }
+    } catch (err) {
+      console.error('Failed to delete old image:', err);
     }
-    cb(new Error('Only image files are allowed!'));
+  }
+};
+
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "portfolio",
+    allowed_formats: ["jpg", "png", "jpeg", "webp"]
   }
 });
+
+const upload = multer({ storage });
 
 // @desc    Show all projects in admin panel
 // @route   GET /admin/projects
@@ -42,6 +42,8 @@ exports.getAdminProjects = async (req, res) => {
     res.status(500).send('Server Error');
   }
 };
+
+
 
 // @desc    Show create project form
 // @route   GET /admin/projects/new
@@ -80,7 +82,7 @@ exports.createProject = async (req, res) => {
       };
 
       if (req.file) {
-        projectData.image = `/uploads/${req.file.filename}`;
+       projectData.image = req.file.path;
       }
 
       const project = new Project(projectData);
@@ -121,42 +123,53 @@ exports.getEditProject = async (req, res) => {
 // @route   PUT /admin/projects/:id
 exports.updateProject = async (req, res) => {
   try {
+    // 1. Get existing project from database
+    const existingProject = await Project.findById(req.params.id);
+    
+    // 2. Start multer upload
     upload.single('image')(req, res, async function (err) {
+      
+      // 3. Handle upload errors
       if (err) {
-        const project = await Project.findById(req.params.id);
         return res.render('admin/projects/form', { 
           title: 'Edit Project',
-          project,
+          project: existingProject,
           error: err.message 
         });
       }
 
+      // 4. Extract form data
       const { title, description, technologies, projectUrl, githubUrl, featured, order } = req.body;
       
+      // 5. Prepare update data
       const projectData = {
         title,
         description,
-        technologies: technologies ? technologies.split(',').map(t => t.trim()) : [],
+        technologies: technologies ? technologies.split(',').map(t => t.trim()).filter(t => t) : [],
         projectUrl,
         githubUrl,
         featured: featured === 'on',
         order: order || 0
       };
 
+      // 6. 🔴 HANDLE IMAGE UPDATE HERE (your code goes here)
       if (req.file) {
-        projectData.image = `/uploads/${req.file.filename}`;
+        if (existingProject.image && !existingProject.image.includes('default_projectImage.png')) {
+          await deleteCloudinaryImage(existingProject.image);
+        }
+        projectData.image = req.file.path;
+      } else {
+        projectData.image = existingProject.image || '/images/default_projectImage.png';
       }
 
+      // 7. Update database
       const project = await Project.findByIdAndUpdate(
         req.params.id,
         projectData,
         { new: true, runValidators: true }
       );
 
-      if (!project) {
-        return res.status(404).send('Project not found');
-      }
-
+      // 8. Redirect
       res.redirect('/admin/projects');
     });
   } catch (error) {
@@ -169,10 +182,17 @@ exports.updateProject = async (req, res) => {
 // @route   DELETE /admin/projects/:id
 exports.deleteProject = async (req, res) => {
   try {
-    const project = await Project.findByIdAndDelete(req.params.id);
+    const project = await Project.findById(req.params.id);
     if (!project) {
       return res.status(404).send('Project not found');
     }
+    
+    // Delete image from Cloudinary (if not default)
+    if (project.image && !project.image.includes('default_projectImage.png')) {
+      await deleteCloudinaryImage(project.image);
+    }
+    
+    await Project.findByIdAndDelete(req.params.id);
     res.redirect('/admin/projects');
   } catch (error) {
     console.error(error);
