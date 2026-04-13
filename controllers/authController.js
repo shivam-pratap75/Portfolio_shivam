@@ -13,15 +13,15 @@ exports.getLogin = (req, res) => {
 // @route   POST /auth/login
 exports.login = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { email, password } = req.body;
 
     // Validate input
-    if (!username || !password) {
+    if (!email || !password) {
   return res.render('auth/login', { error: 'Please provide username and password' });
 }
 
     // Find user
-    const user = await User.findOne({ username });
+    const user = await User.findOne({ email });
     if (!user) {
       return res.render('auth/login', { 
         title: 'Admin Login',
