@@ -85,30 +85,50 @@ exports.updateSocial = async (req, res) => {
 exports.updateSkills = async (req, res) => {
   try {
     const { skillNames } = req.body;
-    
+
     let settings = await SiteSettings.findOne();
-    
+
     if (!settings) {
       settings = new SiteSettings();
     }
-    
-    // Parse skills from comma-separated string
+
     if (skillNames) {
-      const skillsArray = skillNames.split(',').map(skill => skill.trim()).filter(skill => skill);
-      settings.skills = skillsArray.map((skill, index) => ({
-        name: skill,
-        icon: getIconForSkill(skill),
-        image: '', // Will be updated separately if image uploaded
-        order: index
-      }));
+      let skillsArray;
+
+      if (Array.isArray(skillNames)) {
+        skillsArray = skillNames.map(skill => skill.trim()).filter(skill => skill);
+      } else {
+        skillsArray = skillNames.split(',').map(skill => skill.trim()).filter(skill => skill);
+      }
+
+      // Ensure existing skills array exists
+      if (!settings.skills) {
+        settings.skills = [];
+      }
+
+      // Avoid duplicates
+      const existingSkillNames = settings.skills.map(s => s.name.toLowerCase());
+
+      const newSkills = skillsArray
+        .filter(skill => !existingSkillNames.includes(skill.toLowerCase()))
+        .map((skill, index) => ({
+          name: skill,
+          icon: getIconForSkill(skill),
+          image: '',
+          order: settings.skills.length + index
+        }));
+
+      // Append skills
+      settings.skills = [...settings.skills, ...newSkills];
     }
-    
+
     settings.updatedAt = Date.now();
-    
+
     await settings.save();
-    
-    req.flash('success_msg', 'Skills updated successfully');
+
+    req.flash('success_msg', 'Skills added successfully');
     res.redirect('/admin/settings');
+
   } catch (error) {
     console.error(error);
     req.flash('error_msg', 'Error updating skills');
