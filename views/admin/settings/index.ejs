@@ -166,14 +166,19 @@
               </form>
 
               <!-- ✅ DELETE SKILL BUTTON (NEW) -->
-              <form action="/admin/settings/skills/<%= skill._id %>?_method=DELETE" 
-                    method="POST" 
-                    class="delete-skill-form"
-                    onsubmit="return confirm('Delete <%= skill.name %> skill?')">
-                <button type="submit" class="delete-skill-btn" title="Delete skill">
-                  <i class="fas fa-trash"></i>
-                </button>
-              </form>
+             <!-- Delete button that opens modal -->
+<button type="button" class="delete-skill-btn" 
+        onclick="showDeleteSkillModal('<%= skill._id %>', '<%= skill.name.replace(/'/g, "\\'") %>')" 
+        title="Delete skill">
+  <i class="fas fa-trash"></i>
+</button>
+
+<!-- Hidden form for modal submission -->
+<form id="deleteSkillForm_<%= skill._id %>" 
+      action="/admin/settings/skills/<%= skill._id %>?_method=DELETE" 
+      method="POST" 
+      style="display: none;">
+</form>
 
             </div>
           <% }) %>
@@ -182,6 +187,29 @@
       </div>
     <% } %>
 
+  </div>
+</div>
+    <!-- Custom Delete Confirmation Modal for Skills -->
+<div id="deleteSkillModal" class="modal-overlay">
+  <div class="modal-container">
+    <div class="modal-header">
+      <i class="fas fa-exclamation-triangle modal-icon"></i>
+      <h2>Delete Skill?</h2>
+    </div>
+    <div class="modal-body">
+      <p>Are you sure you want to delete <strong id="skillName"></strong>?</p>
+      <p class="warning-text">This action cannot be undone. The skill icon will also be deleted.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeDeleteSkillModal()">
+        <i class="fas fa-times"></i> Cancel
+      </button>
+      <form id="deleteSkillForm" method="POST" style="display: inline;">
+        <button type="submit" class="btn-confirm-delete">
+          <i class="fas fa-trash"></i> Yes, Delete
+        </button>
+      </form>
+    </div>
   </div>
 </div>
 
@@ -232,4 +260,36 @@ function showTab(event,tabName) {
   // Add active class to clicked button
   event.target.classList.add('active');
 }
+
+// Skill Delete Modal Functions
+function showDeleteSkillModal(skillId, skillName) {
+  const modal = document.getElementById('deleteSkillModal');
+  const nameElement = document.getElementById('skillName');
+  const deleteForm = document.getElementById('deleteSkillForm');
+  
+  nameElement.textContent = skillName;
+  deleteForm.action = `/admin/settings/skills/${skillId}?_method=DELETE`;
+  modal.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeDeleteSkillModal() {
+  const modal = document.getElementById('deleteSkillModal');
+  modal.classList.remove('active');
+  document.body.style.overflow = 'auto';
+}
+
+// Close modal when clicking outside
+document.getElementById('deleteSkillModal')?.addEventListener('click', function(e) {
+  if (e.target === this) {
+    closeDeleteSkillModal();
+  }
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    closeDeleteSkillModal();
+  }
+});
 </script>
