@@ -62,29 +62,7 @@ app.use('/', require('./routes/index'));
 app.use('/auth', require('./routes/auth'));
 app.use('/admin/projects', require('./routes/projects'));
 app.use('/admin/settings', require('./routes/settings'));
-app.get("/create-admin", async (req, res) => {
-  try {
-    const bcrypt = require("bcryptjs"); // ✅ FIXED
-    const User = require("./models/User");
 
-    const existingUser = await User.findOne({ username: "admin" });
-    if (existingUser) {
-      return res.send("Admin already exists");
-    }
-
-    const hashedPassword = await bcrypt.hash("1234", 10);
-
-    await User.create({
-      username: "admin",
-      password: hashedPassword
-    });
-
-    res.send("Admin created successfully");
-  } catch (error) {
-    console.error(error);
-    res.send("Error: " + error.message);
-  }
-});
 
 const PORT = process.env.PORT || 3000;
 
