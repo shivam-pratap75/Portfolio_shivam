@@ -111,8 +111,7 @@
         </form>
       </div>
     </div>
-
-  <!-- Skills Tab -->
+<!-- Skills Tab -->
 <div id="skills-tab" class="tab-content">
   <div class="settings-card">
     <h2><i class="fas fa-code"></i> Skills & Technologies</h2>
@@ -148,22 +147,32 @@
 
               <span><%= skill.name %></span>
 
-              <!-- ✅ SEPARATE FORM (NOT NESTED) -->
-              <form action="/admin/settings/skills/upload/<%= encodeURIComponent(skill.name) %>" 
+              <!-- ✅ UPLOAD ICON FORM (FIXED) -->
+              <form action="/admin/settings/skills/upload/<%= skill._id %>" 
                     method="POST" 
                     enctype="multipart/form-data"
                     class="upload-skill-icon-form">
 
-                <label for="skillIcon-<%= skill.name %>" class="upload-icon-btn">
+                <label for="skillIcon-<%= skill._id %>" class="upload-icon-btn">
                   <i class="fas fa-camera"></i>
                 </label>
 
                 <input type="file"
-                       id="skillIcon-<%= skill.name %>"
-                       name="skillIcon"
+                       id="skillIcon-<%= skill._id %>"
+                       name="image"
                        accept="image/*"
                        onchange="this.form.submit()"
                        style="display: none;">
+              </form>
+
+              <!-- ✅ DELETE SKILL BUTTON (NEW) -->
+              <form action="/admin/settings/skills/<%= skill._id %>?_method=DELETE" 
+                    method="POST" 
+                    class="delete-skill-form"
+                    onsubmit="return confirm('Delete <%= skill.name %> skill?')">
+                <button type="submit" class="delete-skill-btn" title="Delete skill">
+                  <i class="fas fa-trash"></i>
+                </button>
               </form>
 
             </div>

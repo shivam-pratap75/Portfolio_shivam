@@ -86,14 +86,22 @@
         </div>
       </div>
 
-      <div class="form-group">
+          <div class="form-group">
         <label for="image">Project Image</label>
-        <% if (project && project.image) { %>
+        
+        <% if (project && project.image && !project.image.includes('default_projectImage.png')) { %>
           <div class="current-image">
             <p>Current Image:</p>
-            <img src="<%= project.image %>" alt="Current project image">
+            <img src="<%= project.image %>" alt="Current project image" style="max-width: 200px;">
+            <small>Upload a new image to replace current one</small>
+          </div>
+        <% } else if (project && project.image && project.image.includes('default_projectImage.png')) { %>
+          <div class="current-image">
+            <p>No custom image uploaded yet</p>
+            <small>Upload an image to customize this project</small>
           </div>
         <% } %>
+        
         <input 
           type="file" 
           id="image" 

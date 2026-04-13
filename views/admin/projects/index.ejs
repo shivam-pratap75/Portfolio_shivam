@@ -28,7 +28,7 @@
             <% projects.forEach(project => { %>
               <tr>
                 <td>
-                  <img src="<%= project.image %>" alt="<%= project.title %>" class="table-image">
+                  <img src="<%= project.image %>" alt="<%= project.title %>" class="table-image" onerror="this.src='/images/default_projectImage.png'">
                 </td>
                 <td><%= project.title %></td>
                 <td>
