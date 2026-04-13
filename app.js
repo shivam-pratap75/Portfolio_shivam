@@ -63,6 +63,20 @@ app.use('/auth', require('./routes/auth'));
 app.use('/admin/projects', require('./routes/projects'));
 app.use('/admin/settings', require('./routes/settings'));
 
+app.get("/create-admin", async (req, res) => {
+  const bcrypt = require("bcrypt");
+  const User = require("./models/User");
+
+  const hashedPassword = await bcrypt.hash("1234", 10);
+
+  await User.create({
+    username: "admin",
+    password: hashedPassword
+  });
+
+  res.send("Admin created successfully");
+});
+
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
